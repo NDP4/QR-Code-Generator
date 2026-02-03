@@ -124,6 +124,9 @@ export default function QRCodeGenerator() {
 
     useEffect(() => {
         if (qrCode) {
+            // Auto-optimize correction level if preload is enabled
+            const finalCorrectionLevel = isPreloadEnabled ? "H" : errorCorrectionLevel;
+
             qrCode.update({
                 data: qrData,
                 image: image,
@@ -131,14 +134,14 @@ export default function QRCodeGenerator() {
                 cornersSquareOptions: { type: cornerSquareType, color: dotColor },
                 cornersDotOptions: { type: cornerDotType, color: dotColor },
                 backgroundOptions: { color: isTransparent ? "transparent" : bgColor },
-                qrOptions: { errorCorrectionLevel: errorCorrectionLevel },
+                qrOptions: { errorCorrectionLevel: finalCorrectionLevel as ErrorCorrectionLevel },
             });
             if (ref.current) {
                 ref.current.innerHTML = "";
                 qrCode.append(ref.current);
             }
         }
-    }, [qrCode, qrData, dotColor, bgColor, isTransparent, dotType, cornerSquareType, cornerDotType, image, errorCorrectionLevel]);
+    }, [qrCode, qrData, dotColor, bgColor, isTransparent, dotType, cornerSquareType, cornerDotType, image, errorCorrectionLevel, isPreloadEnabled]);
 
     const onDownloadClick = () => {
         if (!qrCode) return;
