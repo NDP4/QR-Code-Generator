@@ -14,7 +14,7 @@ import QRCodeStyling, {
 import { getContrastRatio } from "@/lib/utils";
 
 type Extension = "png" | "jpeg" | "webp" | "svg";
-import { Download, Upload, RefreshCw, Smartphone, AlertTriangle, Wifi, User, Link as LinkIcon, Mail, Palette, Type, Eye, ShieldCheck, Settings2, Trash2, RotateCcw, Zap } from "lucide-react";
+import { Download, Upload, RefreshCw, Smartphone, AlertTriangle, Wifi, User, Link as LinkIcon, Mail, Palette, Type, Eye, ShieldCheck, Settings2, Trash2, RotateCcw, Zap, Copy, Check } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,14 @@ export default function QRCodeGenerator() {
 
     // Add Preload State
     const [isPreloadEnabled, setIsPreloadEnabled] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
+
+    const handleCopy = () => {
+        if (!qrData) return;
+        navigator.clipboard.writeText(qrData);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+    };
 
     // Core
     const ref = useRef<HTMLDivElement>(null);
@@ -483,7 +491,18 @@ export default function QRCodeGenerator() {
                 </div>
 
                 <div className="flex flex-col gap-2 w-full max-w-md bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                    <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-bold">Raw QR Data:</p>
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-bold">Raw QR Data:</p>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                            onClick={handleCopy}
+                            title="Copy to clipboard"
+                        >
+                            {isCopied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                        </Button>
+                    </div>
                     <p className="text-[10px] font-mono text-zinc-600 dark:text-zinc-300 break-all bg-white dark:bg-black/40 p-2 rounded border border-zinc-200 dark:border-zinc-800">
                         {qrData || "No data..."}
                     </p>
