@@ -76,7 +76,9 @@ export default function QRCodeGenerator() {
         switch (contentType) {
             case "url":
                 let processedUrl = url.trim();
-                if (processedUrl && !/^https?:\/\//i.test(processedUrl)) {
+                // Strip redundant protocols if any, then prepend single https://
+                processedUrl = processedUrl.replace(/^(https?:\/\/)+/i, "");
+                if (processedUrl) {
                     processedUrl = `https://${processedUrl}`;
                 }
 
@@ -479,6 +481,19 @@ export default function QRCodeGenerator() {
                         <Download className="mr-2 h-5 w-5" /> Download QR
                     </Button>
                 </div>
+
+                <div className="flex flex-col gap-2 w-full max-w-md bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-bold">Raw QR Data:</p>
+                    <p className="text-[10px] font-mono text-zinc-600 dark:text-zinc-300 break-all bg-white dark:bg-black/40 p-2 rounded border border-zinc-200 dark:border-zinc-800">
+                        {qrData || "No data..."}
+                    </p>
+                    {qrData.length > 150 && (
+                        <p className="text-[10px] text-amber-500 font-medium text-center">
+                            ⚠️ Link sangat panjang. Gunakan Dot Style 'Square' untuk scan lebih stabil.
+                        </p>
+                    )}
+                </div>
+
                 <p className="text-sm text-zinc-500 dark:text-zinc-500 text-center max-w-sm">
                     High quality export ready for print.
                 </p>
