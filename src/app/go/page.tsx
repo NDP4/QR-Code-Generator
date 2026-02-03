@@ -170,7 +170,7 @@ export default function RedirectPage() {
             {/* Footer */}
             <footer className="absolute bottom-8 w-full text-center">
                 <p className="text-zinc-600 text-[10px] tracking-[0.2em] uppercase font-medium">
-                    Powered by Artistic QR System
+                    Powered by Nur Dwi Priyambodo | Artistic QR System
                 </p>
             </footer>
         </div>

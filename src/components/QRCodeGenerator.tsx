@@ -75,11 +75,17 @@ export default function QRCodeGenerator() {
         let data = "";
         switch (contentType) {
             case "url":
-                if (isPreloadEnabled && url) {
+                let processedUrl = url.trim();
+                if (processedUrl && !/^https?:\/\//i.test(processedUrl)) {
+                    processedUrl = `https://${processedUrl}`;
+                }
+
+                if (isPreloadEnabled && processedUrl) {
                     const origin = typeof window !== "undefined" ? window.location.origin : "";
-                    data = `${origin}/go?to=${encodeURIComponent(url)}`;
+                    // Support for local dev IP instead of localhost for easier scanning
+                    data = `${origin}/go?to=${encodeURIComponent(processedUrl)}`;
                 } else {
-                    data = url;
+                    data = processedUrl;
                 }
                 break;
             case "wifi":
