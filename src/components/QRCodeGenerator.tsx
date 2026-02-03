@@ -84,6 +84,7 @@ export default function QRCodeGenerator() {
     const [aiPrompt, setAiPrompt] = useState("");
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiError, setAiError] = useState("");
+    const [aiFeedback, setAiFeedback] = useState("");
 
     // Load AI API Key if exists
     useEffect(() => {
@@ -112,6 +113,11 @@ export default function QRCodeGenerator() {
         try {
             const systemPrompt = `Anda adalah pakar desain grafis dan QR code. 
             Tugas Anda adalah memberikan konfigurasi gaya QR code berdasarkan permintaan user.
+            
+            FITUR TAMBAHAN (Wajib diperhatikan):
+            1. AI Brand Vision: Jika ada gambar logo terlampir, ambil skema warna utamanya untuk 'dotColor' agar matching dengan brand.
+            2. AI Smart URL Analyzer: Perhatikan URL/Data yang diberikan. Jika itu link Sosmed, pilih gaya yang modern/gaul. Jika link Bisnis/Formal, pilih gaya yang elegan/serius.
+            
             Berikan output HANYA dalam format JSON murni tanpa markdown, tanpa penjelasan.
             
             Nilai dotType yang valid: "dots", "rounded", "classy", "classy-rounded", "square", "extra-rounded".
@@ -125,18 +131,40 @@ export default function QRCodeGenerator() {
               "dotType": "salah satu nilai valid di atas",
               "cornerSquareType": "salah satu nilai valid di atas",
               "cornerDotType": "salah satu nilai valid di atas",
-              "bottomText": "Teks pendek yang matching",
-              "bottomTextColor": "Hex code matching"
+              "bottomText": "Teks pendek/CTA yang matching dengan tipe link (misal: 'Follow us!' untuk sosmed)",
+              "bottomTextColor": "Hex code matching",
+              "aiAnalysis": "Penjelasan singkat (1 kalimat) tentang pilihan warna/gaya dan audit scanability (Produk Premium)"
             }
             
-            Permintaan User: "${aiPrompt}"`;
+            Permintaan User: "${aiPrompt}"
+            Target Content: "${qrData}"`;
 
             // Resilient retry logic with different models and versions
             const tryAI = async (modelName: string, version: string) => {
                 const aiInstance = new GoogleGenAI({ apiKey: aiApiKey, apiVersion: version as any });
+
+                // Prepare multimodal parts
+                const parts: any[] = [{ text: systemPrompt }];
+
+                // AI Brand Vision: Include logo if exists
+                if (image && image.startsWith("data:")) {
+                    try {
+                        const [mimeInfo, base64Data] = image.split(";base64,");
+                        const mimeType = mimeInfo.split(":")[1];
+                        parts.push({
+                            inlineData: {
+                                data: base64Data,
+                                mimeType: mimeType
+                            }
+                        });
+                    } catch (e) {
+                        console.warn("Gagal memproses gambar logo untuk AI:", e);
+                    }
+                }
+
                 return await aiInstance.models.generateContent({
                     model: modelName,
-                    contents: [{ role: "user", parts: [{ text: systemPrompt }] }]
+                    contents: [{ role: "user", parts }]
                 });
             };
 
@@ -203,6 +231,7 @@ export default function QRCodeGenerator() {
             if (config.cornerDotType) setCornerDotType(config.cornerDotType);
             if (config.bottomText) setBottomText(config.bottomText);
             if (config.bottomTextColor) setBottomTextColor(config.bottomTextColor);
+            if (config.aiAnalysis) setAiFeedback(config.aiAnalysis);
 
             setAiPrompt("");
         } catch (err: any) {
@@ -315,6 +344,7 @@ export default function QRCodeGenerator() {
         setErrorCorrectionLevel("Q");
         setImage(undefined);
         setBottomText(""); setBottomTextColor("#000000"); setBottomTextSize(16);
+        setAiFeedback("");
     };
 
     const applyPreset = (preset: string) => {
@@ -434,7 +464,6 @@ export default function QRCodeGenerator() {
                                                             {aiError}
                                                         </p>
                                                     )}
-
                                                     <Button
                                                         onClick={handleAiMagic}
                                                         disabled={isAiLoading}
@@ -452,6 +481,18 @@ export default function QRCodeGenerator() {
                                                             </>
                                                         )}
                                                     </Button>
+
+                                                    {aiFeedback && (
+                                                        <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-lg p-3 space-y-2 animate-in fade-in zoom-in duration-500">
+                                                            <div className="flex items-center gap-2 text-blue-800 dark:text-blue-300">
+                                                                <Zap className="w-3.5 h-3.5 fill-blue-500" />
+                                                                <p className="text-[10px] font-bold uppercase tracking-wider">AI Vision Insight</p>
+                                                            </div>
+                                                            <p className="text-[10px] text-blue-700 dark:text-blue-400 leading-relaxed italic">
+                                                                "{aiFeedback}"
+                                                            </p>
+                                                        </div>
+                                                    )}
 
                                                     <div className="flex items-center justify-between pt-1">
                                                         <button
@@ -740,6 +781,6 @@ export default function QRCodeGenerator() {
                     High quality export ready for print.
                 </p>
             </div>
-        </div>
+        </div >
     );
 }
