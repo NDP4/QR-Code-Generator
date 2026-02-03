@@ -14,7 +14,7 @@ import QRCodeStyling, {
 import { getContrastRatio } from "@/lib/utils";
 
 type Extension = "png" | "jpeg" | "webp" | "svg";
-import { Download, Upload, RefreshCw, Smartphone, AlertTriangle, Wifi, User, Link as LinkIcon, Mail, Palette, Type, Eye, ShieldCheck, Settings2, Trash2, RotateCcw } from "lucide-react";
+import { Download, Upload, RefreshCw, Smartphone, AlertTriangle, Wifi, User, Link as LinkIcon, Mail, Palette, Type, Eye, ShieldCheck, Settings2, Trash2, RotateCcw, Zap } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -62,6 +62,9 @@ export default function QRCodeGenerator() {
     const [bottomTextSize, setBottomTextSize] = useState(16);
     const [bottomTextColor, setBottomTextColor] = useState("#000000");
 
+    // Add Preload State
+    const [isPreloadEnabled, setIsPreloadEnabled] = useState(false);
+
     // Core
     const ref = useRef<HTMLDivElement>(null);
     const [qrCode, setQrCode] = useState<QRCodeStyling | null>(null);
@@ -72,7 +75,12 @@ export default function QRCodeGenerator() {
         let data = "";
         switch (contentType) {
             case "url":
-                data = url;
+                if (isPreloadEnabled && url) {
+                    const origin = typeof window !== "undefined" ? window.location.origin : "";
+                    data = `${origin}/go?to=${encodeURIComponent(url)}`;
+                } else {
+                    data = url;
+                }
                 break;
             case "wifi":
                 data = `WIFI:T:${wifiEncryption};S:${wifiSsid};P:${wifiPassword};H:${wifiHidden};;`;
@@ -87,7 +95,7 @@ export default function QRCodeGenerator() {
                 data = url;
         }
         setQrData(data);
-    }, [contentType, url, wifiSsid, wifiPassword, wifiEncryption, wifiHidden, vCardFirstName, vCardLastName, vCardPhone, vCardEmail, emailAddress, emailSubject, emailBody]);
+    }, [contentType, url, wifiSsid, wifiPassword, wifiEncryption, wifiHidden, vCardFirstName, vCardLastName, vCardPhone, vCardEmail, emailAddress, emailSubject, emailBody, isPreloadEnabled]);
 
     // Calculate contrast ratio
     const contrastRatio = getContrastRatio(dotColor, isTransparent ? "#ffffff" : bgColor);
@@ -241,9 +249,22 @@ export default function QRCodeGenerator() {
                                                     <TabsTrigger value="email"><Mail className="w-4 h-4" /></TabsTrigger>
                                                 </TabsList>
 
-                                                <TabsContent value="url" className="space-y-2">
-                                                    <Label>Website URL</Label>
-                                                    <Input placeholder="https://example.com" value={url} onChange={(e) => setUrl(e.target.value)} />
+                                                <TabsContent value="url" className="space-y-4 pt-2">
+                                                    <div className="space-y-2">
+                                                        <Label>Website URL</Label>
+                                                        <Input placeholder="https://example.com" value={url} onChange={(e) => setUrl(e.target.value)} />
+                                                    </div>
+                                                    <div className="flex items-center space-x-2 bg-blue-50 dark:bg-blue-900/10 p-3 rounded-lg border border-blue-100 dark:border-blue-900/30">
+                                                        <Checkbox id="preload" checked={isPreloadEnabled} onCheckedChange={(c) => setIsPreloadEnabled(c as boolean)} />
+                                                        <div className="grid gap-1.5 leading-none">
+                                                            <Label htmlFor="preload" className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400 font-bold">
+                                                                <Zap className="w-3 h-3" /> Aktifkan Animasi Preload
+                                                            </Label>
+                                                            <p className="text-[10px] text-zinc-500">
+                                                                User akan melihat animasi keren sebelum dialihkan ke URL tujuan.
+                                                            </p>
+                                                        </div>
+                                                    </div>
                                                 </TabsContent>
 
                                                 <TabsContent value="wifi" className="space-y-3">
