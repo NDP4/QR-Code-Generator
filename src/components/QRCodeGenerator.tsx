@@ -12,9 +12,10 @@ import QRCodeStyling, {
     CornerDotType,
 } from "qr-code-styling";
 import { getContrastRatio } from "@/lib/utils";
+import { GoogleGenAI } from "@google/genai";
 
 type Extension = "png" | "jpeg" | "webp" | "svg";
-import { Download, Upload, RefreshCw, Smartphone, AlertTriangle, Wifi, User, Link as LinkIcon, Mail, Palette, Type, Eye, ShieldCheck, Settings2, Trash2, RotateCcw, Zap, Copy, Check } from "lucide-react";
+import { Download, Upload, RefreshCw, Smartphone, AlertTriangle, Wifi, User, Link as LinkIcon, Mail, Palette, Type, Eye, ShieldCheck, Settings2, Trash2, RotateCcw, Zap, Copy, Check, Sparkles, Wand2, Key, Info, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,140 @@ export default function QRCodeGenerator() {
     const ref = useRef<HTMLDivElement>(null);
     const [qrCode, setQrCode] = useState<QRCodeStyling | null>(null);
     const [qrData, setQrData] = useState("");
+
+    // AI Magic State
+    const [aiApiKey, setAiApiKey] = useState("");
+    const [aiPrompt, setAiPrompt] = useState("");
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [aiError, setAiError] = useState("");
+
+    // Load AI API Key if exists
+    useEffect(() => {
+        const savedKey = localStorage.getItem("gemini_api_key");
+        if (savedKey) setAiApiKey(savedKey);
+    }, []);
+
+    const saveApiKey = (key: string) => {
+        setAiApiKey(key);
+        localStorage.setItem("gemini_api_key", key);
+    };
+
+    const handleAiMagic = async () => {
+        if (!aiApiKey) {
+            setAiError("Mohon masukkan API Key Google Gemini terlebih dahulu.");
+            return;
+        }
+        if (!aiPrompt) {
+            setAiError("Apa tema atau vibe yang Anda inginkan? Ketikkan sesuatu di atas!");
+            return;
+        }
+
+        setIsAiLoading(true);
+        setAiError("");
+
+        try {
+            const systemPrompt = `Anda adalah pakar desain grafis dan QR code. 
+            Tugas Anda adalah memberikan konfigurasi gaya QR code berdasarkan permintaan user.
+            Berikan output HANYA dalam format JSON murni tanpa markdown, tanpa penjelasan.
+            
+            Nilai dotType yang valid: "dots", "rounded", "classy", "classy-rounded", "square", "extra-rounded".
+            Nilai cornerSquareType yang valid: "dot", "square", "extra-rounded".
+            Nilai cornerDotType yang valid: "dot", "square".
+            
+            JSON structure:
+            {
+              "dotColor": "Hex code warna gelap untuk dots",
+              "bgColor": "Hex code warna terang untuk background",
+              "dotType": "salah satu nilai valid di atas",
+              "cornerSquareType": "salah satu nilai valid di atas",
+              "cornerDotType": "salah satu nilai valid di atas",
+              "bottomText": "Teks pendek yang matching",
+              "bottomTextColor": "Hex code matching"
+            }
+            
+            Permintaan User: "${aiPrompt}"`;
+
+            // Resilient retry logic with different models and versions
+            const tryAI = async (modelName: string, version: string) => {
+                const aiInstance = new GoogleGenAI({ apiKey: aiApiKey, apiVersion: version as any });
+                return await aiInstance.models.generateContent({
+                    model: modelName,
+                    contents: [{ role: "user", parts: [{ text: systemPrompt }] }]
+                });
+            };
+
+            let response;
+            const modelsToTry = [
+                "gemini-2.5-flash",
+                "gemini-3-flash-preview",
+                "gemini-1.5-flash",
+                "gemini-1.5-flash-latest",
+                "gemini-2.0-flash",
+                "gemini-2.0-flash-exp",
+                "gemini-pro"
+            ];
+            const versionsToTry = ["v1", "v1beta"];
+
+            let lastErr: any = null;
+            modelLoop: for (const ver of versionsToTry) {
+                for (const mod of modelsToTry) {
+                    try {
+                        console.log(`Magic AI: Mencoba ${mod} pada ${ver}...`);
+                        response = await tryAI(mod, ver);
+                        if (response) {
+                            console.log(`Magic AI: Berhasil menggunakan ${mod} (${ver})`);
+                            break modelLoop;
+                        }
+                    } catch (e: any) {
+                        lastErr = e;
+                        console.warn(`Magic AI: Gagal ${mod} pada ${ver}`, e.message);
+                    }
+                }
+            }
+
+            if (!response) {
+                // Diagnostic step: Try to see what models are actually available
+                try {
+                    const aiDiag = new GoogleGenAI({ apiKey: aiApiKey });
+                    const listResponse = await aiDiag.models.list() as any;
+                    // Some SDK versions return .models, others are iterables
+                    const modelList = listResponse.models || listResponse;
+                    const availableNames = Array.isArray(modelList)
+                        ? modelList.map((m: any) => m.name).join(", ")
+                        : JSON.stringify(modelList).substring(0, 200);
+
+                    console.error("Diagnostic - Available models for this key:", availableNames);
+                    throw new Error(`Semua model standar gagal (404). Model yang tersedia untuk key Anda adalah: ${availableNames || "Tidak ditemukan"}. Harap pastikan API Key Studio Anda aktif.`);
+                } catch (diagErr) {
+                    throw lastErr || new Error("Semua model AI gagal diakses (404) dan gagal mengambil daftar model.");
+                }
+            }
+
+            const text = response.text || "";
+            if (!text) throw new Error("AI returned empty response");
+
+            const cleanJson = text.replace(/```json|```/g, "").trim();
+            const config = JSON.parse(cleanJson);
+
+            if (config.dotColor) setDotColor(config.dotColor);
+            if (config.bgColor) {
+                setBgColor(config.bgColor);
+                setIsTransparent(false);
+            }
+            if (config.dotType) setDotType(config.dotType);
+            if (config.cornerSquareType) setCornerSquareType(config.cornerSquareType);
+            if (config.cornerDotType) setCornerDotType(config.cornerDotType);
+            if (config.bottomText) setBottomText(config.bottomText);
+            if (config.bottomTextColor) setBottomTextColor(config.bottomTextColor);
+
+            setAiPrompt("");
+        } catch (err: any) {
+            console.error(err);
+            setAiError("Gagal memanggil AI. Pastikan API Key benar atau kuota belum habis.");
+        } finally {
+            setIsAiLoading(false);
+        }
+    };
 
     // Calculate Data based on Type
     useEffect(() => {
@@ -244,6 +379,94 @@ export default function QRCodeGenerator() {
                                 <Accordion type="single" collapsible defaultValue="content" className="w-full">
 
                                     {/* Presets Section */}
+                                    {/* AI Magic Section */}
+                                    <AccordionItem value="aimagic" className="border-zinc-200/50 dark:border-zinc-800/50">
+                                        <AccordionTrigger className="hover:no-underline py-3 px-1">
+                                            <span className="flex items-center gap-2 text-sm font-semibold">
+                                                <Sparkles className="w-4 h-4 text-purple-500 animate-pulse" /> ✨ AI Magic Assistant
+                                            </span>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="space-y-4 pt-2 px-1">
+                                            {!aiApiKey ? (
+                                                <div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 rounded-lg p-4 space-y-3">
+                                                    <div className="flex items-start gap-2">
+                                                        <Key className="w-4 h-4 text-purple-600 dark:text-purple-400 mt-0.5" />
+                                                        <div className="space-y-1">
+                                                            <p className="text-xs font-bold text-purple-900 dark:text-purple-300">Butuh API Key Gemini</p>
+                                                            <p className="text-[10px] text-purple-700 dark:text-purple-400 leading-relaxed">
+                                                                Fitur ini menggunakan AI Google Gemini. Gratis & Aman!
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Input
+                                                            type="password"
+                                                            placeholder="Masukkan API Key Anda..."
+                                                            className="h-8 text-[11px] bg-white dark:bg-zinc-950 border-purple-200"
+                                                            onChange={(e) => saveApiKey(e.target.value)}
+                                                        />
+                                                        <a
+                                                            href="https://aistudio.google.com/app/apikey"
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-1.5 text-[9px] text-purple-600 dark:text-purple-400 hover:underline font-medium"
+                                                        >
+                                                            <Info className="w-3 h-3" /> Ambil API Key Gratis Disini
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    <div className="space-y-2">
+                                                        <Label className="text-[11px] text-zinc-500 flex items-center gap-1">
+                                                            <Wand2 className="w-3 h-3" /> Apa vibe yang Anda mau?
+                                                        </Label>
+                                                        <Textarea
+                                                            placeholder="Contoh: 'Tema Cyberpunk ungu neon', 'Minimalist coffee shop', atau 'Vibe hutan rimba'"
+                                                            className="text-xs min-h-[80px] bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 focus:ring-purple-500"
+                                                            value={aiPrompt}
+                                                            onChange={(e) => setAiPrompt(e.target.value)}
+                                                        />
+                                                    </div>
+
+                                                    {aiError && (
+                                                        <p className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/10 p-2 rounded border border-red-100 dark:border-red-900/20">
+                                                            {aiError}
+                                                        </p>
+                                                    )}
+
+                                                    <Button
+                                                        onClick={handleAiMagic}
+                                                        disabled={isAiLoading}
+                                                        className="w-full h-9 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold text-xs rounded-lg shadow-md group active:scale-95 transition-all"
+                                                    >
+                                                        {isAiLoading ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                                🪄 Meracik Desain...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Sparkles className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform" />
+                                                                ✨ Terapkan Magic AI
+                                                            </>
+                                                        )}
+                                                    </Button>
+
+                                                    <div className="flex items-center justify-between pt-1">
+                                                        <button
+                                                            onClick={() => saveApiKey("")}
+                                                            className="text-[9px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 underline"
+                                                        >
+                                                            Ganti API Key
+                                                        </button>
+                                                        <p className="text-[9px] text-zinc-400 italic">Powered by Gemini AI</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </AccordionContent>
+                                    </AccordionItem>
+
                                     <AccordionItem value="presets" className="border-zinc-200/50 dark:border-zinc-800/50">
                                         <AccordionTrigger className="hover:no-underline py-3 px-1"><span className="flex items-center gap-2 text-sm font-semibold"><Palette className="w-4 h-4 text-blue-500" /> Quick Presets</span></AccordionTrigger>
                                         <AccordionContent>
